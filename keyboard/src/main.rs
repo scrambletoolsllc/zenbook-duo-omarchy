@@ -604,7 +604,10 @@ fn draw_key(frame: &mut Frame, size: Size, k: &Placed, kb: &Keyboard, unit_h: f3
     let rect = deck_rect(size, k.rect);
     let path = Path::rounded_rectangle(rect.position(), rect.size(), (0.1 * unit_h).into());
     frame.fill(&path, fill);
-    draw_legend(frame, rect, k, kb, unit_h);
+    // Legends scale with the smaller of the unit key's height and width, so
+    // they still fit when the deck is squeezed narrow (portrait).
+    let unit_w = size.width * (60.0 / (DECK.2 - DECK.0));
+    draw_legend(frame, rect, k, kb, unit_h, unit_h.min(unit_w));
 }
 
 const DECK_COLOR: Color = Color::from_rgb8(0x56, 0x57, 0x5b);
@@ -627,10 +630,10 @@ fn label(frame: &mut Frame, content: String, at: Point, size: f32, font: Font, a
     });
 }
 
-fn draw_legend(frame: &mut Frame, rect: Rectangle, k: &Placed, kb: &Keyboard, unit_h: f32) {
+fn draw_legend(frame: &mut Frame, rect: Rectangle, k: &Placed, kb: &Keyboard, unit_h: f32, unit: f32) {
     let center = rect.center();
-    let main = 0.38 * unit_h;
-    let small = 0.22 * unit_h;
+    let main = 0.38 * unit;
+    let small = 0.22 * unit;
     match k.legend {
         Legend::Main(s) => label(frame, s.into(), center, main, Font::DEFAULT, Alignment::Center),
         Legend::Dual(top, bottom) => {
@@ -651,10 +654,11 @@ fn draw_legend(frame: &mut Frame, rect: Rectangle, k: &Placed, kb: &Keyboard, un
         }
         Legend::Icon(icon, f) => {
             // Icon-only half-height keys (arrows) fill the key; F-row icons
-            // leave room for their F-label.
+            // leave room for their F-label. Both are capped by the key's
+            // width, which is what runs out in portrait.
             let size = match (rect.height < 0.7 * unit_h, f.is_empty()) {
-                (true, true) => 0.95 * rect.height,
-                (true, false) => 0.62 * rect.height,
+                (true, true) => (0.95 * rect.height).min(0.6 * rect.width),
+                (true, false) => (0.62 * rect.height).min(0.36 * rect.width),
                 _ => main,
             };
             if f.is_empty() {
