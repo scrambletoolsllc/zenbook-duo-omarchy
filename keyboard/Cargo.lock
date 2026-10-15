@@ -3435,6 +3435,7 @@ version = "0.1.0"
 dependencies = [
  "iced",
  "iced_layershell",
+ "ttf-parser",
  "wayland-client",
  "wayland-protocols-misc",
  "wayland-protocols-wlr",

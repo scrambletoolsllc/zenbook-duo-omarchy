@@ -11,6 +11,7 @@ mod input;
 
 use std::collections::HashMap;
 use std::process::Command;
+use std::sync::OnceLock;
 use std::sync::mpsc::Sender;
 use std::time::{Duration, Instant};
 
@@ -28,6 +29,38 @@ use input::InputCmd;
 
 const OUTPUT: &str = "eDP-2";
 const ICONS: Font = Font::with_name("JetBrainsMono Nerd Font");
+
+/// How far each icon's ink is off its advance's centre, in ems. The Nerd
+/// Font's icons are wider than its monospace cell and start at the cell's
+/// left edge, so centring the cell leaves wide icons off to the right.
+fn icon_offset(c: char) -> f32 {
+    static OFFSETS: OnceLock<HashMap<char, f32>> = OnceLock::new();
+    let offsets = OFFSETS.get_or_init(|| {
+        let mut map = HashMap::new();
+        let Some(data) = Command::new("fc-match")
+            .args(["-f", "%{file}", "JetBrainsMono Nerd Font"])
+            .output()
+            .ok()
+            .and_then(|o| std::fs::read(String::from_utf8_lossy(&o.stdout).as_ref()).ok())
+        else {
+            return map;
+        };
+        let Ok(face) = ttf_parser::Face::parse(&data, 0) else { return map };
+        let em = f32::from(face.units_per_em());
+        let icons = ROWS.iter().flat_map(|r| r.keys.iter().map(|k| &k.legend))
+            .chain(BOTTOM_KEYS.iter().map(|(_, _, k)| &k.legend))
+            .chain(ARROWS.iter().map(|(_, k)| &k.legend));
+        for legend in icons {
+            let Legend::Icon(c, _) = *legend else { continue };
+            let Some(g) = face.glyph_index(c) else { continue };
+            let (Some(b), Some(adv)) = (face.glyph_bounding_box(g), face.glyph_hor_advance(g)) else { continue };
+            let ink = (f32::from(b.x_min) + f32::from(b.x_max)) / 2.0;
+            map.insert(c, (ink - f32::from(adv) / 2.0) / em);
+        }
+        map
+    });
+    offsets.get(&c).copied().unwrap_or(0.0)
+}
 
 // --- Layout ---------------------------------------------------------------
 
@@ -634,6 +667,12 @@ fn label(frame: &mut Frame, content: String, at: Point, size: f32, font: Font, a
     });
 }
 
+/// An icon with its ink, not its cell, centred on `at`.
+fn draw_icon(frame: &mut Frame, icon: char, at: Point, size: f32) {
+    let at = Point::new(at.x - icon_offset(icon) * size, at.y);
+    label(frame, icon.to_string(), at, size, ICONS, Alignment::Center);
+}
+
 /// `size`, shrunk so `text` spans at most 85% of `width`.
 fn fit(size: f32, text: &str, width: f32) -> f32 {
     // Average advance of the UI font, as a fraction of its size.
@@ -686,15 +725,15 @@ fn draw_legend(frame: &mut Frame, rect: Rectangle, k: &Placed, kb: &Keyboard, un
                 // The narrow hide and swap keys get a little more margin than the arrows.
                 let w = if matches!(k.action, Action::Hide | Action::SwapScreens) { 0.6 } else { 0.8 };
                 let size = if half { (0.95 * rect.height).min(w * rect.width) } else { main };
-                label(frame, icon.to_string(), center, size, ICONS, Alignment::Center);
+                draw_icon(frame, icon, center, size);
             } else if portrait {
                 let size = (0.42 * rect.height).min(0.6 * rect.width);
-                label(frame, icon.to_string(), upper, size, ICONS, Alignment::Center);
+                draw_icon(frame, icon, upper, size);
                 word(frame, f, lower, 0.3 * rect.height);
             } else {
                 let size = if half { (0.62 * rect.height).min(0.36 * rect.width) } else { main };
                 let x = rect.x + 0.36 * rect.width;
-                label(frame, icon.to_string(), Point::new(x, center.y), size, ICONS, Alignment::Center);
+                draw_icon(frame, icon, Point::new(x, center.y), size);
                 let fx = rect.x + 0.74 * rect.width;
                 label(frame, f.into(), Point::new(fx, center.y), 0.5 * size, Font::DEFAULT, Alignment::Center);
             }

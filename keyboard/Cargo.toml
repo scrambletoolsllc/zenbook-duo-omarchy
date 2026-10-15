@@ -14,6 +14,8 @@ iced = { version = "0.14", default-features = false, features = ["tiny-skia", "w
 wayland-client = "0.31"
 wayland-protocols-wlr = { version = "0.3", features = ["client"] }
 wayland-protocols-misc = { version = "0.3", features = ["client"] }
+# Icon glyph bounds, for centring (already in iced's tree).
+ttf-parser = { version = "0.25", default-features = false, features = ["std"] }
 # Not used directly: iced_layershell 0.19.1's devtools crate does not build
 # against winit-core 0.31.0-beta.3, so hold the whole tree at beta.2.
 winit-core = "=0.31.0-beta.2"
