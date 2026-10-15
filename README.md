@@ -420,17 +420,22 @@ watcher's. After a turn, the watcher keeps workspace order: the left screen
 (side by side) or the upper one (stacked) shows the lower-numbered
 workspace.
 
-**Sharing mode.** The hinge sensor reports the opening angle and the base's
-tilt from level. Sharing mode starts when the hinge is open at least 170°
-**and** the base is within 15° of level, and ends below 160° or above 25°.
-Opened flat but tilted up (on the kickstand or in your hands) stays normal
-use. Typical readings:
+**Sharing mode.** Sharing mode starts when the hinge sensor reports the
+hinge open at least 170° **and** the accelerometer reports the laptop lying
+flat (`iio-sensor-proxy` tilt `face-up` or `face-down`), and ends below 160°
+or when it no longer lies flat. Opened flat but tilted up on the kickstand
+or in your hands is normal use, and so is standing it on its side for dual
+portrait: then the rotation above applies and both screens turn portrait,
+side by side. The hinge sensor's own base-tilt channel can't tell these
+apart: it measures front-to-back tilt only, so a laptop stood on its side
+reads as level. Typical readings:
 
-| Pose | Hinge | Base tilt |
-|---|---|---|
-| Laptop | 107–118° | 2–3° |
-| Opened flat, lying on the table | 177° | 1–2° |
-| Opened flat, tilted up | 177° | 45–55° |
+| Pose | Hinge | Base tilt | Accelerometer |
+|---|---|---|---|
+| Laptop | 105–118° | 2–12° | normal, tilted-down |
+| Opened flat, lying on the table | 175–179° | 0–2° | face-down |
+| Opened flat, tilted up (kickstand) | 177° | 45–55° | tilted |
+| Opened flat, stood on its side (dual portrait) | 166–176° | 1–14° | left-up / right-up, vertical or tilted-down |
 
 To hold the current layout, create `~/.local/state/zenbook/rotation-lock`;
 delete it to resume.

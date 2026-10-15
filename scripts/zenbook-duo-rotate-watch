@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Zenbook Duo: rotate both panels with the device, and turn the top panel
 # around for the person opposite when the laptop lies opened flat on a table
-# (opened flat but tilted up, on the kickstand or in hand, is normal use).
+# (opened flat but tilted up, on the kickstand or in hand, or stood on its
+# side for dual portrait, is not sharing).
 #
 # Follows iio-sensor-proxy's accelerometer orientation (normal, bottom-up,
-# left-up, right-up) and the hinge sensor's opening angle, writes the
+# left-up, right-up) and tilt, and the hinge sensor's opening angle, writes the
 # resulting layout (one of those, or "sharing") to
 # ~/.local/state/zenbook/rotation and reloads Hyprland;
 # ~/.config/hypr/monitors.lua turns that into per-panel transforms and a
@@ -22,10 +23,8 @@ STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/zenbook"
 STATE="$STATE_DIR/rotation"
 LOCK="$STATE_DIR/rotation-lock"
 SETTLE=1.0      # an orientation reading must hold this long (seconds)
-SHARE_ON=170    # hinge angle (degrees) at which sharing mode starts...
+SHARE_ON=170    # hinge angle (degrees) at which sharing mode can start...
 SHARE_OFF=160   # ...and below which it ends; the gap stops flicker at the edge
-LEVEL_ON=15     # base tilt (degrees) at or under which it counts as lying flat...
-LEVEL_OFF=25    # ...and over which it is tilted up again
 POLL=0.5        # hinge poll interval (seconds)
 mkdir -p "$STATE_DIR"
 
@@ -33,14 +32,12 @@ hinge_raw() {
   local d
   for d in /sys/bus/iio/devices/iio:device*; do
     if [[ $(<"$d/name") == hinge ]]; then
-      # Channel 0 "hinge" is the opening angle, channel 2 "keyboard" the
-      # base's tilt from level; raw values are degrees.
-      echo "$d/in_angl0_raw $d/in_angl2_raw"
+      echo "$d/in_angl0_raw" # channel 0 "hinge": opening angle in degrees
       return
     fi
   done 2>/dev/null
 }
-read -r HINGE BASE < <(hinge_raw)
+HINGE=$(hinge_raw)
 
 # Keep workspace order matching the layout: the panel at 0x0 (the left one
 # side by side, the upper one stacked) shows the lower-numbered of the two
@@ -79,11 +76,16 @@ while true; do
     [[ $orientation == sharing ]] && orientation=normal
     sharing=0
     pending="" pending_since=0
+    tilt=""
     while true; do
       if read -r -t "$POLL" line; then
         case $line in
           *"orientation changed:"*) pending=${line##*: } ;;
-          *"(orientation: "*) pending=${line#*orientation: }; pending=${pending%%,*} ;;
+          *"(orientation: "*)
+            pending=${line#*orientation: }; pending=${pending%%,*}
+            tilt=${line##*tilt: }; tilt=${tilt%)}
+            ;;
+          *"Tilt changed:"*) tilt=${line##*: }; continue ;; # used on the next poll
           *) continue ;;
         esac
         case $pending in normal | bottom-up | left-up | right-up) pending_since=$(now_ms) ;; *) pending="" ;; esac
@@ -97,11 +99,15 @@ while true; do
         pending=""
       fi
 
-      if [[ -n $HINGE ]] && angle=$(<"$HINGE") && tilt=$(<"$BASE"); then
-        ((tilt > 180)) && ((tilt = 360 - tilt)) # either way from level
-        if ((sharing == 0 && angle >= SHARE_ON && tilt <= LEVEL_ON)); then
+      # Sharing needs the hinge open flat AND the laptop lying flat, which the
+      # accelerometer reports as face-up or face-down. Stood on its side for
+      # dual portrait (vertical / tilted) or tilted on the kickstand, it is not.
+      if [[ -n $HINGE ]] && angle=$(<"$HINGE"); then
+        lying=0
+        [[ $tilt == face-up || $tilt == face-down ]] && lying=1
+        if ((sharing == 0 && angle >= SHARE_ON && lying)); then
           sharing=1
-        elif ((sharing == 1 && (angle <= SHARE_OFF || tilt >= LEVEL_OFF))); then
+        elif ((sharing == 1 && (angle <= SHARE_OFF || !lying))); then
           sharing=0
         fi
       fi 2>/dev/null
