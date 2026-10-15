@@ -605,9 +605,13 @@ fn draw_key(frame: &mut Frame, size: Size, k: &Placed, kb: &Keyboard, unit_h: f3
     let path = Path::rounded_rectangle(rect.position(), rect.size(), (0.1 * unit_h).into());
     frame.fill(&path, fill);
     // Legends scale with the smaller of the unit key's height and width, so
-    // they still fit when the deck is squeezed narrow (portrait).
+    // they still fit when the deck is squeezed narrow. In portrait (taller
+    // than wide) the keys are tall, so legends get twice that, each shrunk to
+    // its key's width, and the function row stacks its labels.
     let unit_w = size.width * (60.0 / (DECK.2 - DECK.0));
-    draw_legend(frame, rect, k, kb, unit_h, unit_h.min(unit_w));
+    let portrait = size.height > size.width;
+    let unit = if portrait { 2.0 * unit_w.min(unit_h) } else { unit_h.min(unit_w) };
+    draw_legend(frame, rect, k, kb, unit_h, unit, portrait);
 }
 
 const DECK_COLOR: Color = Color::from_rgb8(0x56, 0x57, 0x5b);
@@ -630,12 +634,24 @@ fn label(frame: &mut Frame, content: String, at: Point, size: f32, font: Font, a
     });
 }
 
-fn draw_legend(frame: &mut Frame, rect: Rectangle, k: &Placed, kb: &Keyboard, unit_h: f32, unit: f32) {
+/// `size`, shrunk so `text` spans at most 85% of `width`.
+fn fit(size: f32, text: &str, width: f32) -> f32 {
+    // Average advance of the UI font, as a fraction of its size.
+    size.min(0.85 * width / (0.6 * text.chars().count().max(1) as f32))
+}
+
+fn draw_legend(frame: &mut Frame, rect: Rectangle, k: &Placed, kb: &Keyboard, unit_h: f32, unit: f32, portrait: bool) {
     let center = rect.center();
     let main = 0.38 * unit;
     let small = 0.22 * unit;
+    // Two lines, one above the other (function row in portrait).
+    let upper = Point::new(center.x, rect.y + 0.36 * rect.height);
+    let lower = Point::new(center.x, rect.y + 0.74 * rect.height);
+    let word = |frame: &mut Frame, s: &str, at: Point, size: f32| {
+        label(frame, s.into(), at, fit(size, s, rect.width), Font::DEFAULT, Alignment::Center);
+    };
     match k.legend {
-        Legend::Main(s) => label(frame, s.into(), center, main, Font::DEFAULT, Alignment::Center),
+        Legend::Main(s) => word(frame, s, center, main),
         Legend::Dual(top, bottom) => {
             let left = rect.x + 0.28 * rect.width;
             label(frame, top.into(), Point::new(left, rect.y + 0.28 * rect.height), small, Font::DEFAULT, Alignment::Center);
@@ -643,27 +659,40 @@ fn draw_legend(frame: &mut Frame, rect: Rectangle, k: &Placed, kb: &Keyboard, un
         }
         Legend::Word(s) => {
             let s = match k.action {
-                Action::FRow(_, f) if kb.fn_lock => f.to_string(),
-                _ => s.to_string(),
+                Action::FRow(_, f) if kb.fn_lock => f,
+                _ => s,
             };
-            label(frame, s, center, small, Font::DEFAULT, Alignment::Center);
+            // "/A  F12", "DEL INS": stacked in portrait.
+            match s.split_once(' ') {
+                Some((a, b)) if portrait => {
+                    let size = 0.3 * rect.height;
+                    word(frame, a, upper, size);
+                    word(frame, b.trim(), lower, size);
+                }
+                // F9, F11: as large as the other F-labels.
+                _ if portrait && matches!(k.action, Action::FRow(..)) => word(frame, s, center, 0.3 * rect.height),
+                _ => word(frame, s, center, small),
+            }
         }
-        Legend::Icon(icon, f) if kb.fn_lock && matches!(k.action, Action::FRow(..)) => {
-            let _ = icon;
-            label(frame, f.into(), center, small * 1.2, Font::DEFAULT, Alignment::Center);
+        Legend::Icon(_, f) if kb.fn_lock && matches!(k.action, Action::FRow(..)) => {
+            word(frame, f, center, small * 1.2);
         }
         Legend::Icon(icon, f) => {
             // Icon-only half-height keys (arrows) fill the key; F-row icons
-            // leave room for their F-label. Both are capped by the key's
-            // width, which is what runs out in portrait.
-            let size = match (rect.height < 0.7 * unit_h, f.is_empty()) {
-                (true, true) => (0.95 * rect.height).min(0.6 * rect.width),
-                (true, false) => (0.62 * rect.height).min(0.36 * rect.width),
-                _ => main,
-            };
+            // leave room for their F-label, beside it, or above it in
+            // portrait. All are capped by the key's width.
+            let half = rect.height < 0.7 * unit_h;
             if f.is_empty() {
+                // The narrow hide and swap keys get a little more margin than the arrows.
+                let w = if matches!(k.action, Action::Hide | Action::SwapScreens) { 0.6 } else { 0.8 };
+                let size = if half { (0.95 * rect.height).min(w * rect.width) } else { main };
                 label(frame, icon.to_string(), center, size, ICONS, Alignment::Center);
+            } else if portrait {
+                let size = (0.42 * rect.height).min(0.6 * rect.width);
+                label(frame, icon.to_string(), upper, size, ICONS, Alignment::Center);
+                word(frame, f, lower, 0.3 * rect.height);
             } else {
+                let size = if half { (0.62 * rect.height).min(0.36 * rect.width) } else { main };
                 let x = rect.x + 0.36 * rect.width;
                 label(frame, icon.to_string(), Point::new(x, center.y), size, ICONS, Alignment::Center);
                 let fx = rect.x + 0.74 * rect.width;
