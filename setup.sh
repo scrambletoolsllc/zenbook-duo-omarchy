@@ -8,8 +8,11 @@
 set -euo pipefail
 HERE="$(dirname "$(readlink -f "$0")")"
 
-echo "==> Installing script dependencies (brightnessctl, inotify-tools, iio-sensor-proxy, jq)"
-pkexec pacman -S --needed --noconfirm brightnessctl inotify-tools iio-sensor-proxy libarchive jq
+echo "==> Installing dependencies (brightnessctl, inotify-tools, iio-sensor-proxy, jq, the keyboard's icon font)"
+# The icon font: Omarchy ships it as ttf-jetbrains-mono-nerd-basic, which
+# conflicts with the full package, so only add one if nothing provides it.
+font=; pacman -Q ttf-jetbrains-mono-nerd >/dev/null 2>&1 || font=ttf-jetbrains-mono-nerd
+pkexec pacman -S --needed --noconfirm brightnessctl inotify-tools iio-sensor-proxy libarchive jq $font
 
 echo "==> Keyboard: hid-asus rebind and the Fn-key bridge (section 8)"
 # The rm cleans up an older version of this package, which also shipped an
@@ -50,6 +53,12 @@ install -D -m 0755 "$HERE/scripts/zenbook-duo-auto-brightness" \
   "$HOME/.config/zenbook/zenbook-duo-auto-brightness"
 install -D -m 0755 "$HERE/scripts/zenbook-duo-osk" \
   "$HOME/.config/zenbook/zenbook-duo-osk"
+# A running rotation watcher keeps its old code (a second copy exits on its
+# lock): restart it. It keeps its workspace-swap flag across the restart.
+if pkill -f 'zenbook-duo-rotate-[w]atch$'; then
+  sleep 0.5
+  setsid -f "$HOME/.config/zenbook/zenbook-duo-rotate-watch" >/dev/null 2>&1
+fi
 
 echo "==> Bar: show the Omarchy bar on the screen with workspace 1 only (rebuilt on every omarchy update)"
 omarchy hook install post-update "$HERE/scripts/zenbook-duo-bar" >/dev/null &&
@@ -63,6 +72,8 @@ echo "==> On-screen keyboard (Rust): building keyboard/, adding its bar button"
 # keyboard/mise.toml pins the toolchain for mise users; any stable cargo works.
 if command -v cargo >/dev/null; then
   if (cd "$HERE/keyboard" && cargo build --release --locked); then
+    # Close a running keyboard so the next open runs the new build.
+    pgrep -x zenbook-duo-key >/dev/null && "$HOME/.config/zenbook/zenbook-duo-osk" close
     install -D -m 0755 "$HERE/keyboard/target/release/zenbook-duo-keyboard" \
       "$HOME/.config/zenbook/zenbook-duo-keyboard"
     mkdir -p "$HOME/.config/omarchy/plugins"

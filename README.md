@@ -45,11 +45,13 @@ Run it as your normal user; root steps go through `pkexec`. It installs:
 - the keyboard helper, Fn-key daemon and udev rule (`scripts/`, `udev/`)
 - ASUS's sensor-hub firmware, downloaded from ASUS and checked against
   pinned checksums (section 11)
-- the helper scripts, into `~/.config/zenbook/`
+- the helper scripts, into `~/.config/zenbook/`, restarting a running
+  rotation watcher so it picks up the new copy
 - Omarchy hooks for the bar (section 3), a kernel check after updates and a
   health check after boot (below)
 - the on-screen keyboard and its bar button, built from `keyboard/` if
-  `cargo` is installed (section 10)
+  `cargo` is installed (section 10); an open keyboard is closed, so the next
+  open runs the new build
 - four Hyprland blocks from `hypr/`, in `~/.config/hypr/monitors.lua`,
   `input.lua`, `autostart.lua` and `bindings.lua`, between
   `-- >>> zenbook-duo-omarchy >>>` marker comments. It asks before touching
@@ -349,6 +351,15 @@ Home / Page Up / Page Down / End. Otherwise the F-row sends the media
 functions, as on the physical keyboard. The two keys left of DEL/INS close
 the keyboard and swap the two screens' workspaces.
 
+**In portrait** (laptop on its side), the bottom screen is tall and narrow,
+so the keys are too. The function row then stacks each icon above its F-key
+name (and /A over F12, DEL over INS), and the other legends are drawn twice
+as large, each shrunk only as far as it must be to fit its key. Icons come
+from JetBrainsMono Nerd Font (Omarchy's default font; setup.sh makes sure
+it is installed); the keyboard centres each one by its drawn width, read from
+the font file, because the font's icons are wider than the space it reserves
+for them.
+
 **Touchpad.** One finger moves the pointer, a tap clicks, a two-finger tap
 right-clicks, and a two-finger slide scrolls.
 
@@ -516,6 +527,8 @@ Then:
 - Turn the laptop onto each side: both screens rotate, workspace 1 is on
   the left screen either way, and touch lands where you touch. Turn it back
   upright: workspace 1 is on the top screen again.
+- On its side, open the on-screen keyboard: the function row shows each icon
+  above its F-key name, every legend fits its key, and the icons sit centred.
 - Lay it opened flat on the table: the top screen turns around; tilt it up
   and it turns back.
 - Cover the light sensor near the webcam: the screens fade darker.
