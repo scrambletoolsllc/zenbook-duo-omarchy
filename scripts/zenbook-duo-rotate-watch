@@ -9,9 +9,9 @@
 # resulting layout (one of those, or "sharing") to
 # ~/.local/state/zenbook/rotation and reloads Hyprland;
 # ~/.config/hypr/monitors.lua turns that into per-panel transforms and a
-# stacked or side-by-side layout. Workspaces stay with their panel: 1 on the
-# top panel, 2 on the bottom one (monitors.lua binds it there), whichever way
-# the device is turned.
+# stacked or side-by-side layout. Workspace 1 is on the top panel and 2 on the
+# bottom one (monitors.lua binds it there), except in portrait, where 1 is
+# always on the left panel (see set_swap).
 #
 # Needs: iio-sensor-proxy, and the ASUS ISH firmware for the sensors.
 # Started from ~/.config/hypr/autostart.lua.
@@ -41,6 +41,24 @@ hinge_raw() {
 }
 HINGE=$(hinge_raw)
 
+# In portrait, workspace 1 belongs on the left screen. With the top panel on
+# the left (right-up) that is already so; with it on the right (left-up) the
+# bottom panel is on the left, so the two panels' workspaces are swapped for
+# as long as that lasts. The flag file records a swap in effect, so it is
+# always undone exactly once, even across a restart of this watcher.
+SWAPPED="$STATE_DIR/workspaces-swapped"
+
+set_swap() {
+  local want=$1 have=0
+  [[ -e $SWAPPED ]] && have=1
+  ((want == have)) && return
+  # Both panels must be on to swap (the bottom one is off while docked).
+  hyprctl -j monitors | jq -e 'map(.name) | index("eDP-1") and index("eDP-2")' >/dev/null || return
+  sleep 0.5 # let the reload settle the new layout first
+  hyprctl dispatch 'hl.dsp.workspace.swap_monitors({ monitor1 = "eDP-1", monitor2 = "eDP-2" })' >/dev/null 2>&1
+  if ((want)); then : >"$SWAPPED"; else rm -f "$SWAPPED"; fi
+}
+
 apply() {
   local want=$1
   [[ $want == "$applied" ]] && return
@@ -48,6 +66,7 @@ apply() {
   printf '%s\n' "$want" >"$STATE"
   hyprctl reload >/dev/null 2>&1
   applied=$want
+  if [[ $want == left-up ]]; then set_swap 1; else set_swap 0; fi
 }
 
 now_ms() { echo $((${EPOCHREALTIME/./} / 1000)); }
