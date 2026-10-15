@@ -20,7 +20,7 @@ In order of how much you'd miss them:
 | # | Feature | Without it |
 |---|---|---|
 | 2 | Sound | no sound card at all ("Dummy Output") |
-| 3 | Displays: upright top screen, stacked layout, correct mouse pointer, bar on the top screen only | top screen upside down; pointer mirrored; a second bar on the bottom screen |
+| 3 | Displays: upright top screen, stacked layout, correct mouse pointer, bar only on the screen with workspace 1 | top screen upside down; pointer mirrored; a second bar on the bottom screen |
 | 4 | Screen brightness, on both screens | brightness keys and slider change nothing |
 | 5 | Reliable boot | some boots hang with a dark top screen after login |
 | 6 | Touchscreens, each mapped to its own screen | top touchscreen dead, kernel oops, shutdown hangs |
@@ -149,12 +149,15 @@ unrotated coordinates, so on the top screen the pointer moves mirrored.
 which rotates with the picture. Drop it once Hyprland rotates the cursor
 plane itself.
 
-**Bar on the top screen only.** Omarchy's bar puts a panel on every screen,
-and the bottom screen doesn't need one. Until Omarchy has a setting for it
+**Bar on the screen with workspace 1.** Omarchy's bar puts a panel on every
+screen, and only one of the two built-in screens needs one: the top screen,
+or, on its side with the top screen on the right, the bottom screen, which
+then holds workspace 1 (section 11). Until Omarchy has a setting for it
 ([PR #6501](https://github.com/omacom/omarchy/pull/6501), `bar.screens`),
 `scripts/zenbook-duo-bar` clones the built-in bar (`omarchy plugin clone
 omarchy.bar`, which becomes "My Bar") and filters its per-screen panels to
-every screen except `eDP-2`, so an external monitor still gets a bar.
+every screen except the built-in one without workspace 1. The bar moves as
+soon as workspace 1 does, and an external monitor still gets a bar.
 setup.sh installs it as an Omarchy **post-update hook**: during every
 `omarchy update` it asks whether to rebuild the clone from the freshly
 updated bar, so the bar keeps getting Omarchy's changes (`omarchy update -y`
@@ -502,6 +505,7 @@ Then:
 - Touch each screen: the cursor reacts on the screen you touched.
 - Dock the keyboard: the bottom screen turns off within about 2 s, and comes
   back a few seconds after you lift the keyboard away, with no bar on it.
+- Turn it onto each side: the bar is on the left screen, with workspace 1.
 - Volume, mute, keyboard backlight and mic-mute keys work, docked and over
   Bluetooth.
 - Lifted off, the keyboard types over Bluetooth within a few seconds (if

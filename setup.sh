@@ -51,7 +51,7 @@ install -D -m 0755 "$HERE/scripts/zenbook-duo-auto-brightness" \
 install -D -m 0755 "$HERE/scripts/zenbook-duo-osk" \
   "$HOME/.config/zenbook/zenbook-duo-osk"
 
-echo "==> Bar: keep the Omarchy bar off the bottom screen (rebuilt on every omarchy update)"
+echo "==> Bar: show the Omarchy bar on the screen with workspace 1 only (rebuilt on every omarchy update)"
 omarchy hook install post-update "$HERE/scripts/zenbook-duo-bar" >/dev/null &&
   bash "$HERE/scripts/zenbook-duo-bar" refresh
 

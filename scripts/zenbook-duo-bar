@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# Keep the Omarchy bar off the Zenbook Duo's bottom screen (eDP-2), while
-# still getting Omarchy's bar updates.
+# Show the Omarchy bar on only one of the Zenbook Duo's two screens, the one
+# with workspace 1, while still getting Omarchy's bar updates. That is the top
+# screen (eDP-1), except on its side with the top screen on the right, where
+# the rotation watcher moves workspace 1 to the bottom screen (eDP-2) on the
+# left. Other monitors keep their bar.
 #
 # The built-in bar puts a panel on every screen. Until Omarchy has a setting
 # for this (omacom/omarchy PR #6501), this clones the built-in bar
 # (`omarchy plugin clone omarchy.bar`) and filters its per-screen panels to
-# every screen except eDP-2. Installed as an Omarchy post-update hook, it
+# every screen except the built-in one without workspace 1, following
+# workspace 1 as it moves. Installed as an Omarchy post-update hook, it
 # rebuilds the clone from the freshly updated bar on every `omarchy update`,
 # so the clone never falls behind. If the patch no longer applies (the bar's
 # code changed), it switches back to the built-in bar and says so.
@@ -14,7 +18,8 @@
 
 set -uo pipefail
 
-SKIP_SCREEN=eDP-2
+# The built-in screen to leave out: eDP-2, or eDP-1 while workspace 1 is on eDP-2.
+SKIP_SCREEN='(Hyprland.workspaces.values.some(w => w.id === 1 \&\& w.monitor \&\& w.monitor.name === "eDP-2") ? "eDP-1" : "eDP-2")'
 CLONE_ID="${USER:-$(id -un)}.bar"
 CLONE_DIR="$HOME/.config/omarchy/plugins/$CLONE_ID"
 # Every per-screen panel in Bar.qml is a Variants block on this model line.
@@ -32,13 +37,13 @@ confirm() {
   # `omarchy update -y` promises no questions; take that as a yes.
   [[ -n ${OMARCHY_UPDATE_UNATTENDED:-} ]] && return 0
   [[ -t 0 ]] || return 0
-  echo "    Rebuilds your bar from the updated Omarchy bar, without the bottom"
-  echo "    screen ($SKIP_SCREEN); the bar blinks once while the shell restarts."
+  echo "    Rebuilds your bar from the updated Omarchy bar, on the screen with"
+  echo "    workspace 1 only; the bar blinks once while the shell restarts."
   gum confirm "Refresh the bar?"
 }
 
 refresh() {
-  echo "==> Zenbook Duo: refreshing the bar without the bottom screen"
+  echo "==> Zenbook Duo: refreshing the bar for the screen with workspace 1"
   if ! confirm; then
     say "skipped; the bar stays as it was"
     return 0
@@ -56,6 +61,8 @@ refresh() {
 
   local bar="$CLONE_DIR/Bar.qml" found
   found=$(grep -cE "$MODEL_LINE" "$bar" 2>/dev/null || true)
+  # The filter reads Hyprland's workspaces, so the bar must import them.
+  grep -qx 'import Quickshell.Hyprland' "$bar" || found="no Hyprland import, $found"
   if [[ $found != "$EXPECTED_PANELS" ]]; then
     say "the Omarchy bar has changed ($found per-screen panels found, $EXPECTED_PANELS expected);"
     say "switched back to the standard bar, which shows on both screens"
@@ -65,11 +72,11 @@ refresh() {
       >/dev/null 2>&1 || true
     return 0
   fi
-  sed -i -E "s/$MODEL_LINE/\\1(\\2).filter(screen => screen.name !== \"$SKIP_SCREEN\")/" "$bar"
+  sed -i -E "s/$MODEL_LINE/\\1(\\2).filter(screen => screen.name !== $SKIP_SCREEN)/" "$bar"
 
   # A running shell can keep a plugin's previous code; restart to load it.
   omarchy restart shell >/dev/null 2>&1 || true
-  say "done: bar on every screen except $SKIP_SCREEN"
+  say "done: bar on the screen with workspace 1"
 }
 
 case "${1:-refresh}" in
