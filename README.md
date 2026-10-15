@@ -416,9 +416,8 @@ writes the layout to `~/.local/state/zenbook/rotation` and reloads Hyprland.
 position; `hypr/input.lua` rotates each touchscreen to match, since
 Hyprland doesn't rotate touch input with the display. Because the layout
 lives in the config, it survives every reload, including the dock
-watcher's. After a turn, the watcher keeps workspace order: the left screen
-(side by side) or the upper one (stacked) shows the lower-numbered
-workspace.
+watcher's. Workspaces stay with their screen whichever way the laptop is
+turned: workspace 1 on the top screen, workspace 2 on the bottom one.
 
 **Sharing mode.** Sharing mode starts when the hinge sensor reports the
 hinge open at least 170° **and** the accelerometer reports the laptop lying
@@ -509,7 +508,7 @@ Then:
   on-screen keyboard; taps type into the focused window and the touchpad
   moves the pointer.
 - Turn the laptop onto each side: both screens rotate, workspace 1 stays on
-  the left, and touch lands where you touch.
+  the top screen and 2 on the bottom one, and touch lands where you touch.
 - Lay it opened flat on the table: the top screen turns around; tilt it up
   and it turns back.
 - Cover the light sensor near the webcam: the screens fade darker.

@@ -9,7 +9,9 @@
 # resulting layout (one of those, or "sharing") to
 # ~/.local/state/zenbook/rotation and reloads Hyprland;
 # ~/.config/hypr/monitors.lua turns that into per-panel transforms and a
-# stacked or side-by-side layout.
+# stacked or side-by-side layout. Workspaces stay with their panel: 1 on the
+# top panel, 2 on the bottom one (monitors.lua binds it there), whichever way
+# the device is turned.
 #
 # Needs: iio-sensor-proxy, and the ASUS ISH firmware for the sensors.
 # Started from ~/.config/hypr/autostart.lua.
@@ -39,22 +41,6 @@ hinge_raw() {
 }
 HINGE=$(hinge_raw)
 
-# Keep workspace order matching the layout: the panel at 0x0 (the left one
-# side by side, the upper one stacked) shows the lower-numbered of the two
-# visible workspaces. Workspaces stay on the panel they were created on, so
-# without this, turning the device moves "workspace 1" to the right.
-order_workspaces() {
-  local json first second
-  json=$(hyprctl -j monitors 2>/dev/null) || return
-  read -r first second < <(jq -r '
-    (map(select(.x == 0 and .y == 0))[0].activeWorkspace.id // empty) as $p
-    | (map(select(.x != 0 or .y != 0))[0].activeWorkspace.id // empty) as $s
-    | "\($p) \($s)"' <<<"$json")
-  [[ -n $first && -n $second ]] || return 0 # one panel (keyboard docked)
-  ((second < first)) || return 0
-  hyprctl dispatch 'hl.dsp.workspace.swap_monitors({ monitor1 = "eDP-1", monitor2 = "eDP-2" })' >/dev/null 2>&1
-}
-
 apply() {
   local want=$1
   [[ $want == "$applied" ]] && return
@@ -62,8 +48,6 @@ apply() {
   printf '%s\n' "$want" >"$STATE"
   hyprctl reload >/dev/null 2>&1
   applied=$want
-  sleep 0.5
-  order_workspaces
 }
 
 now_ms() { echo $((${EPOCHREALTIME/./} / 1000)); }
